@@ -19,59 +19,60 @@ const sheetsConfig = {
 // 1. INITIALIZATION & SETUP
 // ===================================
 
-function initializeSheets() {
-  const sheetNames = Object.values(sheetsConfig);
+const SHEET_HEADERS = {
+  users: ['Email', 'PasswordHash', 'Name', 'Role', 'Status', 'CreatedAt'],
+  items: ['ItemID', 'ItemName', 'Category', 'TotalQty', 'AvailableQty', 'Description', 'CreatedAt', 'ImageUrl'],
+  borrowing: ['BorrowID', 'UserEmail', 'ItemID', 'ItemName', 'Quantity', 'Status', 'BorrowDate', 'ReturnDate', 'Reason', 'CreatedAt', 'UpdatedAt'],
+  settings: ['Key', 'Value']
+};
 
-  sheetNames.forEach(name => {
-    if (!ss.getSheetByName(name)) {
-      ss.insertSheet(name);
+const HEADER_COLORS = {
+  users: '#4285F4',
+  items: '#34A853',
+  borrowing: '#EA4335',
+  settings: '#FBBC04'
+};
+
+// Guarantees row 1 is the header row. A blank sheet reports getLastRow() === 0
+// (NOT 1), which the old guard got wrong -- so headers were never written and
+// the first record landed in row 1, where every reader skips it as a header.
+// Also repairs sheets that already went wrong, without losing rows.
+function ensureHeader_(sheet, headers, color) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  } else {
+    const row1 = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+
+    if (String(row1[0]).trim() === headers[0]) return; // already correct
+
+    if (String(row1[0]).trim() === '') {
+      // Blank key column => not a real record (e.g. the stray ImageUrl cell).
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    } else {
+      // Row 1 holds a real record -- push it down instead of clobbering it.
+      sheet.insertRowBefore(1);
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     }
-  });
-
-  // Users Sheet
-  let usersSheet = ss.getSheetByName(sheetsConfig.users);
-  if (usersSheet.getLastRow() === 1 && usersSheet.getLastColumn() <= 1) {
-    usersSheet.appendRow(['Email', 'PasswordHash', 'Name', 'Role', 'Status', 'CreatedAt']);
-    usersSheet.getRange(1, 1, 1, 6).setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
   }
 
-  // Items Sheet
-  let itemsSheet = ss.getSheetByName(sheetsConfig.items);
-  if (itemsSheet.getLastRow() === 1 && itemsSheet.getLastColumn() <= 1) {
-    itemsSheet.appendRow(['ItemID', 'ItemName', 'Category', 'TotalQty', 'AvailableQty', 'Description', 'CreatedAt', 'ImageUrl']);
-    itemsSheet.getRange(1, 1, 1, 8).setBackground('#34A853').setFontColor('white').setFontWeight('bold');
-  }
-
-  // MIGRATION: Tambahkan kolom ImageUrl jika sheet Items sudah ada tapi belum punya kolom H
-  migrateItemsSheetImageColumn();
-
-  // Borrowing Records Sheet
-  let borrowingSheet = ss.getSheetByName(sheetsConfig.borrowing);
-  if (borrowingSheet.getLastRow() === 1 && borrowingSheet.getLastColumn() <= 1) {
-    borrowingSheet.appendRow(['BorrowID', 'UserEmail', 'ItemID', 'ItemName', 'Quantity', 'Status', 'BorrowDate', 'ReturnDate', 'Reason', 'CreatedAt', 'UpdatedAt']);
-    borrowingSheet.getRange(1, 1, 1, 11).setBackground('#EA4335').setFontColor('white').setFontWeight('bold');
-  }
-
-  // Settings Sheet
-  let settingsSheet = ss.getSheetByName(sheetsConfig.settings);
-  if (settingsSheet.getLastRow() === 1 && settingsSheet.getLastColumn() <= 1) {
-    settingsSheet.appendRow(['Key', 'Value']);
-    settingsSheet.appendRow(['AppName', 'Sistem Manajemen Peminjaman']);
-    settingsSheet.appendRow(['AdminEmail', 'admin@example.com']);
-    settingsSheet.getRange(1, 1, 1, 2).setBackground('#FBBC04').setFontColor('white').setFontWeight('bold');
-  }
+  sheet.getRange(1, 1, 1, headers.length)
+    .setBackground(color).setFontColor('white').setFontWeight('bold');
 }
 
-function migrateItemsSheetImageColumn() {
-  const itemsSheet = ss.getSheetByName(sheetsConfig.items);
-  const lastCol = itemsSheet.getLastColumn();
-  const header = lastCol > 0 ? itemsSheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+function initializeSheets() {
+  Object.keys(sheetsConfig).forEach(key => {
+    const name = sheetsConfig[key];
+    if (!ss.getSheetByName(name)) ss.insertSheet(name);
+    ensureHeader_(ss.getSheetByName(name), SHEET_HEADERS[key], HEADER_COLORS[key]);
+  });
 
-  if (!header.includes('ImageUrl')) {
-    const targetCol = lastCol < 8 ? 8 : lastCol + 1;
-    itemsSheet.getRange(1, targetCol).setValue('ImageUrl')
-      .setBackground('#34A853').setFontColor('white').setFontWeight('bold');
+  const settingsSheet = ss.getSheetByName(sheetsConfig.settings);
+  if (settingsSheet.getLastRow() === 1) {
+    settingsSheet.appendRow(['AppName', 'Sistem Manajemen Peminjaman']);
+    settingsSheet.appendRow(['AdminEmail', 'admin@example.com']);
   }
+
+  SpreadsheetApp.flush();
 }
 
 // ===================================
@@ -950,7 +951,38 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// google.script.run cannot serialize Date objects across the bridge -- the call
+// dies silently and NEITHER handler fires (endless spinner). Sheets auto-parses
+// date cells, so BorrowDate/ReturnDate come back as Dates. Normalize everything
+// here, at the one point every response passes through.
+function serializable_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  if (Array.isArray(v)) return v.map(serializable_);
+  if (v && typeof v === 'object') {
+    const out = {};
+    Object.keys(v).forEach(k => { out[k] = serializable_(v[k]); });
+    return out;
+  }
+  return v;
+}
+
 function processRequest(action, params) {
+  try {
+    const result = serializable_(routeRequest_(action, params));
+    // Commit buffered sheet writes BEFORE this response reaches the browser.
+    // Without this, the client's follow-up reads (loadHistory/loadStats/loadItems)
+    // run as separate executions and can race the commit, rendering pre-action
+    // state while the sheet is already correct.
+    SpreadsheetApp.flush();
+    return result;
+  } catch (error) {
+    return { success: false, message: 'Server Error: ' + error.toString() };
+  }
+}
+
+function routeRequest_(action, params) {
   try {
     switch (action) {
       // --- AUTH ---

@@ -1490,10 +1490,18 @@
         });
 
         function refreshAdminPanel(silent) {
-            loadPendingRequests(silent);
-            loadAdminItems(silent);
-            loadAdminUsers(silent);
-            loadAllRecords(silent);
+            // ponytail: load only the visible section. The other three are hidden
+            // and switchAdminSection already loads them on click. Firing all four
+            // queued 5 parallel calls, which Apps Script serializes -- and the
+            // poller refilled that queue faster than it drained, so the last one
+            // (Semua Riwayat) spun forever.
+            const activeSection = document.querySelector('.admin-section.active');
+            const sectionId = activeSection ? activeSection.id : 'sectionApproval';
+
+            if (sectionId === 'sectionApproval') loadPendingRequests(silent);
+            if (sectionId === 'sectionItems') loadAdminItems(silent);
+            if (sectionId === 'sectionUsers') loadAdminUsers(silent);
+            if (sectionId === 'sectionAllRecords') loadAllRecords(silent);
             updateAdminPendingBadge();
         }
 
@@ -1523,7 +1531,7 @@
         // tanpa perlu menekan tombol refresh browser.
         // ===================================
         let autoRefreshTimer = null;
-        const AUTO_REFRESH_INTERVAL_MS = 8000;
+        const AUTO_REFRESH_INTERVAL_MS = 20000; // ponytail: 8s outran Apps Script's serialized executions
 
         function startAutoRefresh() {
             stopAutoRefresh();
