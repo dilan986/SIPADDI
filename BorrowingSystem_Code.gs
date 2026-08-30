@@ -805,6 +805,22 @@ function getAllBorrowingRecords() {
 // ===================================
 // EXPORT: Borrow Records to XLSX
 // ===================================
+// google.script.run does not preserve object key order (it marshals objects
+// through a Java map), so json_to_sheet's Object.keys() came out shuffled.
+// Column order has to travel as an array -- arrays survive the bridge intact.
+const EXPORT_COLUMNS = [
+  'ID Peminjaman',
+  'Email Pengguna',
+  'Nama Barang',
+  'Jumlah',
+  'Status',
+  'Alasan',
+  'Tanggal Pinjam',
+  'Dibuat Pada',
+  'Tanggal Kembali',
+  'Diperbarui Pada'
+];
+
 function exportBorrowingRecordsToXlsx() {
   const records = getAllBorrowingRecords();
   
@@ -832,6 +848,7 @@ function exportBorrowingRecordsToXlsx() {
   return {
     success: true,
     data: exportData,
+    columns: EXPORT_COLUMNS,
     filename: 'SIPADDI_Riwayat_Peminjaman_' + new Date().toISOString().slice(0, 10) + '.xlsx',
     timestamp: new Date().toISOString()
   };

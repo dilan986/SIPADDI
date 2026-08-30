@@ -2015,7 +2015,7 @@
                 }
 
                 try {
-                    const worksheet = XLSX.utils.json_to_sheet(result.data);
+                    const worksheet = XLSX.utils.json_to_sheet(result.data, { header: result.columns });
 
                     // Lebar kolom mengikuti urutan header dari server
                     worksheet['!cols'] = [
@@ -2024,11 +2024,11 @@
                         { wch: 20 }, // Nama Barang
                         { wch: 8 },  // Jumlah
                         { wch: 12 }, // Status
-                        { wch: 15 }, // Tanggal Pinjam
-                        { wch: 15 }, // Tanggal Kembali
                         { wch: 30 }, // Alasan
-                        { wch: 22 }, // Dibuat Pada
-                        { wch: 22 }  // Diperbarui Pada
+                        { wch: 15 }, // Tanggal Pinjam
+                        { wch: 24 }, // Dibuat Pada
+                        { wch: 15 }, // Tanggal Kembali
+                        { wch: 24 }  // Diperbarui Pada
                     ];
 
                     const workbook = XLSX.utils.book_new();
