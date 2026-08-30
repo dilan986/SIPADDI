@@ -803,9 +803,9 @@ function getAllBorrowingRecords() {
 }
 
 // ===================================
-// EXPORT: Borrow Records to Excel
+// EXPORT: Borrow Records to XLSX
 // ===================================
-function exportBorrowingRecordsToExcel() {
+function exportBorrowingRecordsToXlsx() {
   const records = getAllBorrowingRecords();
   
   if (records.length === 0) {
@@ -1029,7 +1029,7 @@ function routeRequest_(action, params) {
       case 'rejectBorrow':
         return rejectBorrowRequest(params.borrowID, params.reason);
       case 'exportBorrowingRecords':
-        return exportBorrowingRecordsToExcel();
+        return exportBorrowingRecordsToXlsx();
 
       // --- USERS (Admin CRUD) ---
       case 'getAllUsers':

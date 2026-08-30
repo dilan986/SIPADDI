@@ -6,8 +6,8 @@
     <title>SIPADDI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- SheetJS untuk export Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <!-- SheetJS untuk export XLSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #4285F4;
@@ -893,7 +893,7 @@
                             <div>
                                 <span class="refresh-indicator" id="recordsSyncIndicator"><span class="dot"></span> memperbarui...</span>
                                 <button class="btn btn-light btn-sm" onclick="loadAllRecords()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
-                                <button class="btn btn-light btn-sm" onclick="exportBorrowingRecordsToExcel()" title="Export data ke file Excel"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</button>
+                                <button class="btn btn-light btn-sm" onclick="exportRecordsToXlsx(this)" title="Export data ke file Excel"><i class="bi bi-file-earmark-spreadsheet"></i> Export Excel</button>
                             </div>
                         </div>
                         <div class="card-body">
@@ -1992,8 +1992,7 @@
         // ===================================
         // EXPORT: Borrow Records to Excel
         // ===================================
-        function exportBorrowingRecordsToExcel() {
-            const exportBtn = event.target.closest('button');
+        function exportRecordsToXlsx(exportBtn) {
             const originalHtml = exportBtn.innerHTML;
             exportBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Memproses...';
             exportBtn.disabled = true;
@@ -2006,42 +2005,36 @@
                     showAlert('Gagal export: ' + result.message, 'danger');
                     return;
                 }
-
                 if (!result.data || result.data.length === 0) {
                     showAlert('Tidak ada data untuk diekspor', 'warning');
                     return;
                 }
+                if (typeof XLSX === 'undefined') {
+                    showAlert('Library XLSX gagal dimuat. Periksa koneksi internet, lalu muat ulang halaman.', 'danger');
+                    return;
+                }
 
                 try {
-                    // Pakai SheetJS untuk generate XLSX
                     const worksheet = XLSX.utils.json_to_sheet(result.data);
-                    
-                    // Set column width
+
+                    // Lebar kolom mengikuti urutan header dari server
                     worksheet['!cols'] = [
-                        { wch: 15 }, // ID Peminjaman
+                        { wch: 22 }, // ID Peminjaman
                         { wch: 25 }, // Email Pengguna
                         { wch: 20 }, // Nama Barang
                         { wch: 8 },  // Jumlah
                         { wch: 12 }, // Status
                         { wch: 15 }, // Tanggal Pinjam
                         { wch: 15 }, // Tanggal Kembali
-                        { wch: 20 }, // Alasan
-                        { wch: 20 }, // Dibuat Pada
-                        { wch: 20 }  // Diperbarui Pada
+                        { wch: 30 }, // Alasan
+                        { wch: 22 }, // Dibuat Pada
+                        { wch: 22 }  // Diperbarui Pada
                     ];
 
-                    // Set header styling (warna biru + bold)
-                    const headerRow = worksheet['!rows'] || [];
-                    if (!worksheet['!rows']) {
-                        worksheet['!rows'] = [{ hpx: 25 }]; // Header height
-                    }
-
-                    // Create workbook dan sheet
                     const workbook = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(workbook, worksheet, 'Riwayat Peminjaman');
-
-                    // Trigger download
                     XLSX.writeFile(workbook, result.filename);
+
                     showAlert('Data berhasil diekspor ke Excel', 'success');
                 } catch (err) {
                     console.error('Export error:', err);
